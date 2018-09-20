@@ -1,3 +1,5 @@
 molotov
+pytest
+pytest-xdist
 requests
 requests-hawk

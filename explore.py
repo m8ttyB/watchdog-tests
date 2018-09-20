@@ -1,24 +1,22 @@
 #!/usr/bin/env python
 import os
 
-#import pytest
 import requests
 from requests_hawk import HawkAuth
 
-# url = 'https://watchdogproxy-default.stage.mozaws.net'
+
+if 'HAWK_KEY' not in os.environ:
+    raise Exception('You need to set the HAWK_KEY environ')
+
 url = 'https://watchdogproxy-default.stage.mozaws.net'
 path = '/accept'
-webhook = 'https://webhook.site/20492752-5b4a-47fd-a440-614d22860fb1'
-# negative_uri = 'https://watchdog-proxy.dev.mozaws.net/mock/client/negative'
-# negative_uri = 'https://watchdogproxy-default.stage.mozaws.net/mock/client/negative'
-# positive_uri = 'https://watchdog-proxy.dev.mozaws.net/mock/client/positive'
-# positive_uri = 'https://watchdogproxy-default.stage.mozaws.net/mock/client/positive'
+webhook = 'https://webhook.site/dd8f6f51-270d-4d16-bcca-9a10c8f063b7'
 negative_uri = webhook
 positive_uri = webhook
 positive_email = 'mbrandt@mozilla.com'
 
 id = 'demouser'
-key = '<key>'
+key = os.environ.get('HAWK_KEY')
 
 form_data = {
     'negative_uri': negative_uri,
@@ -26,7 +24,7 @@ form_data = {
     'positive_email': positive_email,
 }
 
-def get_bits(image):
+def _get_bits(image):
     with open(image, 'rb') as f:
         return f.read()
 
@@ -36,7 +34,7 @@ def list_files():
 
 
 def file_data(image):
-    image_data = get_bits(image)
+    image_data = _get_bits(image)
     return {'image': (image, image_data)}
 
 
@@ -70,10 +68,10 @@ def test_positive_png_image():
 
 
 def test_fuzz():
-    image_data = 'mattb' * 100000
+    image_data = 'mattb' * 1000000
     file_data = {'image': ('mattb.jpg', image_data)}
     auth = HawkAuth(id=id, key=key)
     resp = requests.post(url + path,
                          data=form_data, files=file_data,
                          auth=auth)
-    assert resp.status_code is 21, resp.status_code
+    assert resp.status_code is 201, resp.status_code
