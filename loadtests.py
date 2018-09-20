@@ -1,38 +1,84 @@
-#!/usr/bin/env python
-import requests
-from requests_hawk import HawkAuth
-
+import io
+from aiohttp import FormData, MultipartWriter
+import urllib
+import os
+from mohawk import Sender
 import molotov
 
-image = 'images/book.jpg'
-url = 'https://watchdogproxy-default.stage.mozaws.net'
-path = '/accept'
 
-negative_uri = 'https://webhook.site/8550f8d5-6da3-41de-8609-f7d0690bd6ff'
-positive_uri = 'https://webhook.site/8550f8d5-6da3-41de-8609-f7d0690bd6ff'
+path = '/accept'
+negative_uri = 'https://watchdogproxy-default.dev.mozaws.net/mock/client/negative'
+positive_uri = 'https://watchdogproxy-default.dev.mozaws.net/mock/client/positive'
 positive_email = 'mbrandt@mozilla.com'
 
-id = 'demouser'
-key = '<key>'
+# stage config
+if 'HAWK_KEY' not in os.environ:
+    raise Exception('You need to set the HAWK_KEY environ')
+url = 'https://watchdogproxy-default.stage.mozaws.net'
+hawk_config = {'id': 'demouser',
+               'key': os.environ.get('HAWK_KEY'),
+               'algorithm': 'sha256'}
+# dev config
+# url = 'https://watchdogproxy-default.dev.mozaws.net'
+# hawk_config = {'id': 'devuser',
+#                'key': 'devkey',
+#                'algorithm': 'sha256'}
 
 
-def get_bits(image):
-    with open(image, 'rb') as f:
-        return f.read()
+async def get_content(writer):
+    class Streamer:
+        stream = io.BytesIO()
+        async def write(self, data):
+            self.stream.write(data)
+
+    await writer.write(Streamer())
+    Streamer.stream.seek(0)
+
+    return Streamer.stream.read()
 
 
-form_data = {
-    'negative_uri': negative_uri,
-    'positive_uri': positive_uri,
-    'positive_email': positive_email,
-    'image': (get_bits(image), '12345' 'image/jpeg')
-}
+@molotov.scenario(weight=0)
+async def test_large_image(session):
+    headers = {'Authorization': ''}
+    with MultipartWriter(subtype='form-data') as writer:
+        writer.append_form({'boaty': 'mc boat face'})
+        raw = await get_content(writer)
+        sender = Sender(hawk_config, url + path, 'POST',
+                        content=raw,
+                        content_type='multipart/form-data')
+        headers['Authorization'] = sender.request_header
+
+    data = FormData()
+    data.add_field("negative_uri", negative_uri)
+    data.add_field("positive_uri", positive_uri )
+    data.add_field("positive_email", positive_email)
+    data.add_field("image", open('images/img_positive.jpg', 'rb').read(),
+                   filename="images/img_large.jpg")
+    async with session.post(url + path, data=data, headers=headers) as resp:
+        assert resp.status == 201 or resp.status == 401, \
+            'Status code: %s URL: %s Headers: %s Content: %s' % \
+            (resp.status, resp.url, resp.headers, raw[:400])
 
 
 @molotov.scenario(weight=100)
-async def test_simple(session):
-    hawk_auth = HawkAuth(id=id, key=key)
-    async with session.post(url + path,
-                            data=form_data,
-                            auth=hawk_auth) as resp:
-        assert resp.status_code is 201, resp.status_code
+async def test_positive(session):
+    headers = {'Authorization': ''}
+    with MultipartWriter(subtype='form-data') as writer:
+        writer.append_form({'boaty': 'mc boat face'})
+        raw = await get_content(writer)
+        sender = Sender(hawk_config, url + path, 'POST',
+                        content=raw,
+                        content_type='multipart/form-data')
+        headers['Authorization'] = sender.request_header
+
+    data = FormData()
+    data.add_field("negative_uri", negative_uri)
+    data.add_field("positive_uri", positive_uri)
+    data.add_field("positive_email", positive_email)
+    data.add_field("image", open('images/img_positive.jpg', 'rb').read(),
+                   filename="images/img_positive.jpg")
+
+    async with session.post(url + path, data=data, headers=headers) as resp:
+        assert resp.status == 201 or resp.status == 401, \
+            'Status code: %s URL: %s Headers: %s Content: %s' % \
+            (resp.status, resp.url, resp.headers, resp.content)
