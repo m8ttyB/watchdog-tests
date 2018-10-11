@@ -53,9 +53,9 @@ async def test_large_image(session):
     data.add_field("positive_uri", positive_uri )
     data.add_field("positive_email", positive_email)
     data.add_field("image", open('images/img_positive.jpg', 'rb').read(),
-                   filename="images/img_large.jpg")
+                   filename="images/img_4.3.jpg")
     async with session.post(url + path, data=data, headers=headers) as resp:
-        assert resp.status == 201 or resp.status == 401, \
+        assert resp.status == 201, \
             'Status code: %s URL: %s Headers: %s Content: %s' % \
             (resp.status, resp.url, resp.headers, raw[:400])
 
@@ -77,8 +77,12 @@ async def test_positive(session):
     data.add_field("positive_email", positive_email)
     data.add_field("image", open('images/img_positive.jpg', 'rb').read(),
                    filename="images/img_positive.jpg")
-
     async with session.post(url + path, data=data, headers=headers) as resp:
-        assert resp.status == 201 or resp.status == 401, \
+        json = await resp.json()
+        assert 'id' in json
+        assert 'negative_uri' in json
+        assert 'positive_uri' in json
+        assert 'positive_email' in json
+        assert resp.status == 201, \
             'Status code: %s URL: %s Headers: %s Content: %s' % \
             (resp.status, resp.url, resp.headers, resp.content)
