@@ -49,11 +49,15 @@ def submit_image(file):
                          data=form_data, files=_file_data(file),
                          auth=auth)
 
-def inspect_request():
+def inspect_negative_request():
+    img_pos = 'images/img_negative.jpg'
     auth = HawkAuth(id=id, key=key)
-    req = requests.Request('POST', url, data=form_data, files=_file_data('images/img_positive.jpg'), auth=auth)
+    req = requests.Request('POST', url, data=form_data,
+                            files=_file_data(img_pos), auth=auth)
     prepared = req.prepare()
-    print(prepared.body[:800])
+    print('Prepared request:' + str(prepared.body[:800]))
+    resp = submit_image(img_pos)
+    print(resp.json())
 
 
 def test_sumbit_sample_images():
@@ -64,4 +68,4 @@ def test_sumbit_sample_images():
 
 
 if __name__ == '__main__':
-    inspect_request()
+    inspect_negative_request()
