@@ -37,8 +37,15 @@ async def get_content(writer):
     return Streamer.stream.read()
 
 
-@molotov.scenario(weight=0)
-async def test_large_image(session):
+def get_form():
+    form = FormData()
+    form.add_field("negative_uri", negative_uri)
+    form.add_field("positive_uri", positive_uri)
+    form.add_field("positive_email", positive_email)
+    return form
+
+@molotov.scenario(weight=50)
+async def test_negative_large_img(session):
     headers = {'Authorization': ''}
     with MultipartWriter(subtype='form-data') as writer:
         writer.append_form({'boaty': 'mc boat face'})
@@ -47,20 +54,16 @@ async def test_large_image(session):
                         content=raw,
                         content_type='multipart/form-data')
         headers['Authorization'] = sender.request_header
-
-    data = FormData()
-    data.add_field("negative_uri", negative_uri)
-    data.add_field("positive_uri", positive_uri )
-    data.add_field("positive_email", positive_email)
-    data.add_field("image", open('images/img_positive.jpg', 'rb').read(),
+    form = get_form()
+    form.add_field("image", open('images/img_positive.jpg', 'rb').read(),
                    filename="images/img_4.3.jpg")
-    async with session.post(url + path, data=data, headers=headers) as resp:
+    async with session.post(url + path, data=form, headers=headers) as resp:
         assert resp.status == 201, \
             'Status code: %s URL: %s Headers: %s Content: %s' % \
-            (resp.status, resp.url, resp.headers, raw[:400])
+            (resp.status, resp.url, resp.headers, resp.content)
 
 
-@molotov.scenario(weight=100)
+@molotov.scenario(weight=50)
 async def test_positive(session):
     headers = {'Authorization': ''}
     with MultipartWriter(subtype='form-data') as writer:
@@ -70,14 +73,10 @@ async def test_positive(session):
                         content=raw,
                         content_type='multipart/form-data')
         headers['Authorization'] = sender.request_header
-
-    data = FormData()
-    data.add_field("negative_uri", negative_uri)
-    data.add_field("positive_uri", positive_uri)
-    data.add_field("positive_email", positive_email)
-    data.add_field("image", open('images/img_positive.jpg', 'rb').read(),
+    form = get_form()
+    form.add_field("image", open('images/img_positive.jpg', 'rb').read(),
                    filename="images/img_positive.jpg")
-    async with session.post(url + path, data=data, headers=headers) as resp:
+    async with session.post(url + path, data=form, headers=headers) as resp:
         json = await resp.json()
         assert 'id' in json
         assert 'negative_uri' in json
